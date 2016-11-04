@@ -1,0 +1,149 @@
+<html>
+<body>
+<script language="JavaScript">
+
+println=function(str)
+{
+	alert(str);
+}
+
+
+
+
+var ws_handle=new Array();
+
+var ws_onopen=new Array();
+var ws_onerror=new Array();
+var ws_onclose=new Array();
+var ws_onmessage=new Array();
+
+
+
+websocket_open=function(n,url)
+{
+	var n_=n;
+
+	if(n<0 || n>20)return -1;
+
+	ws_handle[n]=null;
+
+	ws_onopen[n]=null;
+	ws_onerror[n]=null;
+	ws_onclose[n]=null;
+	ws_onmessage[n]=null;
+
+	try{
+		ws_handle[n]=new WebSocket(url);
+	}catch(e){
+	}
+	if(ws_handle[n]==null){
+		return -1;
+	}
+
+	ws_handle[n].onmessage=function(evt){
+		if(ws_onmessage[n_]!=null)ws_onmessage[n_](n_,evt.data);
+	}
+	ws_handle[n].onopen=function(evt){
+		if(ws_onopen[n_]!=null)ws_onopen[n_](n_);
+	}
+	ws_handle[n].onerror=function(evt){
+		if(ws_onerror[n_]!=null)ws_onerror[n_](n_);
+	}
+	ws_handle[n].onclose=function(evt){
+		if(ws_onclose[n_]!=null)ws_onclose[n_](n_);
+	}
+	return 0;
+}
+
+
+websocket_send=function(n,str)
+{
+	if(n<0 || n>20 || ws_handle[n]==null)return -1;
+	try{
+	ws_handle[n].send(str);
+	}catch(e){}
+	return 0;
+}
+
+websocket_close=function(n)
+{
+	if(n<0 || n>20 || ws_handle[n]==null)return -1;
+
+	ws_handle[n].close();
+
+	ws_onopen[n]=null;
+	ws_onerror[n]=null;
+	ws_onmessage[n]=null;
+	ws_onclose[n]=null;
+	ws_handle[n]=null;
+}
+
+
+websocket_onmessage=function(n,func)
+{
+	if(n<0 || n>20 || ws_handle[n]==null)return -1;
+	ws_onmessage[n]=func;
+}
+websocket_onclose=function(n,func)
+{
+	if(n<0 || n>20 || ws_handle[n]==null)return -1;
+	ws_onclose[n]=func;
+}
+websocket_onopen=function(n,func)
+{
+	if(n<0 || n>20 || ws_handle[n]==null)return -1;
+	ws_onopen[n]=func;
+}
+websocket_onerror=function(n,func)
+{
+	if(n<0 || n>20 || ws_handle[n]==null)return -1;
+	ws_onerror[n]=func;
+}
+
+
+
+//
+// test code
+//
+
+
+println("hello");
+
+websocket_open(0,"ws://127.0.0.1:12345/websocket/chat/12345/0");
+
+websocket_onmessage(0,function(n,str){
+	println("onmessage");
+	println(str);
+});
+
+websocket_onmessage(0,function(n,str){
+	println("onmessage");
+	println(str);
+});
+
+
+websocket_onopen(0,function(n){
+	println("onopen");
+});
+
+
+websocket_onclose(0,function(n){
+	println("onclose");
+});
+
+websocket_onerror(0,function(n){
+	println("onerror");
+});
+
+
+
+setTimeout(function(){
+websocket_send(0,"abcdefg");
+},2000);
+println("end");
+
+</script>
+</body>
+</html>
+
+
