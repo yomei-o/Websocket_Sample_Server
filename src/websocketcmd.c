@@ -31,15 +31,15 @@ either expressed or implied, of the FreeBSD Project.
 //
 //    Websocket Chat Sample
 //
-//    ws://ipaddress/websocket/chat/[userid]/[forward]
+//    ws://ipaddress/websocket/chat/[userid]
 //
 //    userid: integral number
 //    forward: 0 client
 //    forward: 1 server
 //
-//    server-example:   ws://127.0.0.1/websocket/chat/12345/1
-//    client-example:   ws://127.0.0.1/websocket/chat/12345/0
+//    example:   ws://127.0.0.1/websocket/chat/12345
 //
+//    Websocket Direction is Disabled by Specs.
 //
 
 #include <stdio.h>
@@ -56,6 +56,9 @@ either expressed or implied, of the FreeBSD Project.
 #endif
 
 #define MAX_STRING 256
+#define MAX_WS_N 3
+
+
 struct st_wscmd{
 	const char* url;
 	int(*onopen)(const char* utl,void** vpp);
@@ -75,10 +78,10 @@ struct sw_user_chat{
 
 
 //
-//
+// following is test version1
 //
 
-int onopen_chat(const char* url, void** vpp)
+static int onopen_chat(const char* url, void** vpp)
 {
 	struct sw_user_chat* suc;
 	char *p;
@@ -117,7 +120,7 @@ next:
 }
 
 
-int onclose_chat(const char* utl,void* vp)
+static int onclose_chat(const char* utl, void* vp)
 {
 	struct sw_user_chat* suc;
 	suc = (struct sw_user_chat*)(vp);
@@ -134,7 +137,7 @@ int onclose_chat(const char* utl,void* vp)
 
 }
 
-int onidle_chat(const char* utl, void* vp, char* out_str, int out_sz)
+static int onidle_chat(const char* utl, void* vp, char* out_str, int out_sz)
 {
 	int len;
 	struct sw_user_chat* suc;
@@ -143,7 +146,7 @@ int onidle_chat(const char* utl, void* vp, char* out_str, int out_sz)
 		CFWDIPC_MESSAGE msg;
 		memset(&msg, 0, sizeof(msg));
 
-		printf("ondata_chat ismessage=%s \n", suc->name1);
+		//printf("ondata_chat ismessage=%s \n", suc->name1);
 		if (cfwdipc_is_message(suc->h1) == 0)return 0;
 		printf("ondata_chat read=%s \n", suc->name1);
 		cfwdipc_get_message(suc->h1, &msg);
@@ -155,7 +158,8 @@ int onidle_chat(const char* utl, void* vp, char* out_str, int out_sz)
 	}
 	return 0;
 }
-int ondata_chat(const char* utl, void* vp, const char* in_str)
+
+static int ondata_chat(const char* utl, void* vp, const char* in_str)
 {
 	struct sw_user_chat* suc;
 	suc = (struct sw_user_chat*)(vp);
@@ -176,6 +180,136 @@ int ondata_chat(const char* utl, void* vp, const char* in_str)
 		printf("ondata_chat write=%s \n", suc->name2);
 	}
 
+	suc->h2 = NULL;
+	//strncpy(out_str, in_str,out_sz);
+
+	return 0;
+}
+
+
+//
+// following is  version2
+//
+
+static int onopen_chat2(const char* url, void** vpp)
+{
+	struct sw_user_chat* suc;
+	char *p;
+	int a = 0;
+	int i;
+	printf("onopen_chat()\n");
+
+	if (vpp == NULL)return -1;
+	*vpp = malloc(sizeof(struct sw_user_chat));
+	if (*vpp == NULL)return -1;
+	memset(*vpp, 0, sizeof(struct sw_user_chat));
+	suc = (struct sw_user_chat*)(*vpp);
+
+	p = strchr(url, '/');
+	if (p == NULL)goto next;
+	p++;
+	p = strchr(p + 1, '/');
+	if (p == NULL)goto next;
+	p++;
+	p = strchr(p + 1, '/');
+	if (p == NULL)goto next;
+	p++;
+	sscanf(p, "%d", &a);
+	suc->share_id = a;
+
+	for (i = 0; i < MAX_WS_N; i++){
+		sprintf(suc->name1, "%d_%d",suc->share_id, i);
+		suc->forward = i;
+		suc->h1 = cfwdipc_find_service(suc->name1);
+		if (suc->h1 != NULL){
+			cfwdipc_free_service(suc->h1);
+			continue;
+		}
+		suc->h1 = cfwdipc_start_service(suc->name1);
+		if (suc->h1 != NULL){
+			printf("ws create OK >>%s<< \n",suc->name1);
+			return 0;
+		}
+		break;
+	}
+
+
+
+next:
+	free(suc);
+	return -1;
+}
+
+
+static int onclose_chat2(const char* utl, void* vp)
+{
+	struct sw_user_chat* suc;
+	suc = (struct sw_user_chat*)(vp);
+	printf("onclose_chat()\n");
+
+	if (suc && suc->h1){
+		cfwdipc_stop_service(suc->h1);
+	}
+	if (suc)free(suc);
+
+	//smplws_server_stop();
+
+	return 0;
+
+}
+
+static int onidle_chat2(const char* utl, void* vp, char* out_str, int out_sz)
+{
+	int len;
+	struct sw_user_chat* suc;
+	suc = (struct sw_user_chat*)(vp);
+	if (suc->h1){
+		CFWDIPC_MESSAGE msg;
+		memset(&msg, 0, sizeof(msg));
+
+		//printf("ondata_chat ismessage=%s \n", suc->name1);
+		if (cfwdipc_is_message(suc->h1) == 0)return 0;
+		printf("ondata_chat read=%s \n", suc->name1);
+		cfwdipc_get_message(suc->h1, &msg);
+		len = strlen(msg.data);
+		if (len < 1 || len >= MAX_STRING)return 0;
+
+		strncpy(out_str, msg.data, out_sz);
+		out_str[out_sz - 1] = 0;
+	}
+	return 0;
+}
+
+static int ondata_chat2(const char* utl, void* vp, const char* in_str)
+{
+	int i;
+	struct sw_user_chat* suc;
+	CFWDIPC_MESSAGE msg;
+
+	printf("ondata_chat()\n");
+
+	suc = (struct sw_user_chat*)(vp);
+
+	memset(&msg, 0, sizeof(msg));
+	strncpy(msg.data, in_str, MAX_STRING);
+	msg.data[MAX_STRING - 1] = 0;
+
+
+	for (i = 0; i < MAX_WS_N; i++){
+		if (i == suc->forward)continue;
+
+		sprintf(suc->name2, "%d_%d", suc->share_id, i);
+		suc->h2 = cfwdipc_find_service(suc->name2);
+		if (suc->h2){
+
+			cfwdipc_send_message(suc->h2, &msg);
+			cfwdipc_free_service(suc->h2);
+
+
+			printf("ondata_chat write=%s \n", suc->name2);
+		}
+		suc->h2 = NULL;
+	}
 	//strncpy(out_str, in_str,out_sz);
 
 	return 0;
@@ -186,7 +320,7 @@ int ondata_chat(const char* utl, void* vp, const char* in_str)
 //
 //
 struct st_wscmd a[] = {
-	{"/websocket/chat/",onopen_chat,onclose_chat,onidle_chat,ondata_chat},
+	{"/websocket/chat/",onopen_chat2,onclose_chat2,onidle_chat2,ondata_chat2},
 	{NULL}
 };
 
