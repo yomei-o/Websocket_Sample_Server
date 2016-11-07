@@ -109,7 +109,7 @@ websocket_onerror=function(n,func)
 
 println("hello");
 
-websocket_open(0,"ws://127.0.0.1:12345/websocket/chat/12345/0");
+websocket_open(0,"ws://127.0.0.1:12345/websocket/chat/12345");
 
 websocket_onmessage(0,function(n,str){
 	println("onmessage");
