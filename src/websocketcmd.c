@@ -87,7 +87,7 @@ static int onopen_chat(const char* url, void** vpp)
 	char *p;
 	int a = 0, b = 0;
 
-	printf("onopen_chat()\n");
+	//printf("onopen_chat()\n");
 
 	if (vpp == NULL)return -1;
 	*vpp = malloc(sizeof(struct sw_user_chat));
@@ -113,7 +113,7 @@ static int onopen_chat(const char* url, void** vpp)
 	sprintf(suc->name1, "%d_%d", a, b);
 	sprintf(suc->name2, "%d_%d", a, 1 - b);
 
-	printf("onopen_chat file=%s \n",suc->name1);
+	//printf("onopen_chat file=%s \n",suc->name1);
 	suc->h1 = cfwdipc_start_service(suc->name1);
 next:
 	return 0;
@@ -124,7 +124,7 @@ static int onclose_chat(const char* utl, void* vp)
 {
 	struct sw_user_chat* suc;
 	suc = (struct sw_user_chat*)(vp);
-	printf("onclose_chat()\n");
+	//printf("onclose_chat()\n");
 
 	if (suc && suc->h1){
 		cfwdipc_stop_service(suc->h1);
@@ -148,7 +148,7 @@ static int onidle_chat(const char* utl, void* vp, char* out_str, int out_sz)
 
 		//printf("ondata_chat ismessage=%s \n", suc->name1);
 		if (cfwdipc_is_message(suc->h1) == 0)return 0;
-		printf("ondata_chat read=%s \n", suc->name1);
+		//printf("ondata_chat read=%s \n", suc->name1);
 		cfwdipc_get_message(suc->h1, &msg);
 		len = strlen(msg.data);
 		if (len < 1 || len >= MAX_STRING)return 0;
@@ -164,7 +164,7 @@ static int ondata_chat(const char* utl, void* vp, const char* in_str)
 	struct sw_user_chat* suc;
 	suc = (struct sw_user_chat*)(vp);
 
-	printf("ondata_chat()\n");
+	//printf("ondata_chat()\n");
 
 	suc->h2 = cfwdipc_find_service(suc->name2);
 	if (suc->h2){
@@ -177,7 +177,7 @@ static int ondata_chat(const char* utl, void* vp, const char* in_str)
 		cfwdipc_free_service(suc->h2);
 
 
-		printf("ondata_chat write=%s \n", suc->name2);
+		//printf("ondata_chat write=%s \n", suc->name2);
 	}
 
 	suc->h2 = NULL;
@@ -197,7 +197,7 @@ static int onopen_chat2(const char* url, void** vpp)
 	char *p;
 	int a = 0;
 	int i;
-	printf("onopen_chat()\n");
+	//printf("onopen_chat()\n");
 
 	if (vpp == NULL)return -1;
 	*vpp = malloc(sizeof(struct sw_user_chat));
@@ -227,7 +227,7 @@ static int onopen_chat2(const char* url, void** vpp)
 		}
 		suc->h1 = cfwdipc_start_service(suc->name1);
 		if (suc->h1 != NULL){
-			printf("ws create OK >>%s<< \n",suc->name1);
+			//printf("ws create OK >>%s<< \n",suc->name1);
 			return 0;
 		}
 		break;
@@ -245,7 +245,7 @@ static int onclose_chat2(const char* utl, void* vp)
 {
 	struct sw_user_chat* suc;
 	suc = (struct sw_user_chat*)(vp);
-	printf("onclose_chat()\n");
+	//printf("onclose_chat()\n");
 
 	if (suc && suc->h1){
 		cfwdipc_stop_service(suc->h1);
@@ -269,7 +269,7 @@ static int onidle_chat2(const char* utl, void* vp, char* out_str, int out_sz)
 
 		//printf("ondata_chat ismessage=%s \n", suc->name1);
 		if (cfwdipc_is_message(suc->h1) == 0)return 0;
-		printf("ondata_chat read=%s \n", suc->name1);
+		//printf("ondata_chat read=%s \n", suc->name1);
 		cfwdipc_get_message(suc->h1, &msg);
 		len = strlen(msg.data);
 		if (len < 1 || len >= MAX_STRING)return 0;
@@ -286,7 +286,7 @@ static int ondata_chat2(const char* utl, void* vp, const char* in_str)
 	struct sw_user_chat* suc;
 	CFWDIPC_MESSAGE msg;
 
-	printf("ondata_chat()\n");
+	//printf("ondata_chat()\n");
 
 	suc = (struct sw_user_chat*)(vp);
 
@@ -306,7 +306,7 @@ static int ondata_chat2(const char* utl, void* vp, const char* in_str)
 			cfwdipc_free_service(suc->h2);
 
 
-			printf("ondata_chat write=%s \n", suc->name2);
+			//printf("ondata_chat write=%s \n", suc->name2);
 		}
 		suc->h2 = NULL;
 	}

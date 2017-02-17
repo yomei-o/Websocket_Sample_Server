@@ -78,7 +78,7 @@ static int mymkname(char* buf,int sz,char* name)
 	strncpy(buf,"/tmp/",sz-1);
 	strncat(buf,name,sz-1);
 	buf[sz-1]=0;
-	printf("mkname name=>>%s<<\n",buf);
+	//printf("mkname name=>>%s<<\n",buf);
 	
 #elif defined(unix) && !defined(__CYGWIN__)
 	if(name==NULL || buf==NULL || sz<1)return -1;
@@ -300,7 +300,7 @@ int myfifo_ismessage(void* vp)
 	if(r>0)ret=1;
 #endif
 	
-	printf("myfifo_ismessage %d\n",ret);
+	//printf("myfifo_ismessage %d\n",ret);
 	return ret;
 }
 

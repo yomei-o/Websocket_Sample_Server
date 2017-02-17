@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2016, Yomei Otani <yomei.otani@gmai.com>
+Copyright (c) 2017, Yomei Otani <yomei.otani@gmai.com>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -26,6 +26,11 @@ The views and conclusions contained in the software and documentation are those
 of the authors and should not be interpreted as representing official policies,
 either expressed or implied, of the FreeBSD Project.
 */
+
+#define I_USE_WEBSOCKET
+//#define I_USE_THREAD
+
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -45,6 +50,10 @@ either expressed or implied, of the FreeBSD Project.
 #if defined(_WIN32) && !defined(__GNUC__)
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
+#endif
+
+#ifdef I_USE_THREAD
+#include "mythreadpool.h"
 #endif
 
 #ifdef _MSC_VER
@@ -69,7 +78,8 @@ either expressed or implied, of the FreeBSD Project.
 #define TIMEOUT_RECV 10
 #define MAX_LINE 256
 
-#define I_USE_WEBSOCKET
+#define SELECT__MULTI_MS 200
+
 #define DIR_WEBSOCKET "websocket"
 
 void smplws_init()
@@ -187,15 +197,15 @@ int smplws_accept(int sockfd)
 	return cs;
 }
 
-int smplws_select(int sockfd, int sec)
+int smplws_select_ms(int sockfd, int msec)
 {
 	fd_set readfds;
 	struct timeval t;
 	int ret;
 	//int tmp;
 
-	t.tv_sec = sec;
-	t.tv_usec = 0;
+	t.tv_sec = (msec/1000);
+	t.tv_usec = (msec%1000)*1000;
 
 	FD_ZERO(&readfds);
 	FD_SET(sockfd, &readfds);
@@ -205,15 +215,15 @@ int smplws_select(int sockfd, int sec)
 
 
 
-int smplws_select_multi(int* fds, int n, int sec)
+int smplws_select_multi_ms(int* fds, int n, int msec)
 {
 	fd_set readfds;
 	struct timeval t;
 	int ret;
 	int i;
 	int maxfd = 0;
-	t.tv_sec = sec;
-	t.tv_usec = 0;
+	t.tv_sec = msec/1000;
+	t.tv_usec = (msec%1000)*1000;
 
 	FD_ZERO(&readfds);
 	for (i = 0; i < n; i++){
@@ -508,7 +518,7 @@ int smplws_child_data(void* vp, int fd)
 		ret = smplws_readuntil(fd, c->buf, MAX_LINE, '\n');
 		if (ret <1)return ret;
 
-		printf(">>%s<<\n",c->buf);
+		//printf(">>%s<<\n",c->buf);
 
 		if (strcmp(c->buf, "\r\n") != 0){
 			if (smplws_child_parse_header(fd, c)<0)return -1;
@@ -572,6 +582,82 @@ void smplws_server_stop()
 //
 // smplws_main loop
 //
+#ifdef I_USE_THREAD
+
+void smplws_thread_func(void* vp)
+{
+	int fd;
+	int t,tm_pg,tm,ret;
+	void *v;
+
+	fd = (int)vp;
+
+	smplws_setsockopt_timeout(fd, TIMEOUT_RECV);
+
+	t = smplws_gettime();
+	tm_pg = t;
+	tm = t;
+
+	v = smplws_child_init();
+	if (v == NULL){
+		closesocket(fd);
+		return;
+	}
+
+	while (1){
+		if (s_server_stop)break;
+
+		t = smplws_gettime();
+
+		if ( (t - tm_pg)>PING_TIMEOUT){
+			ret = smplws_child_ping(fd, v);
+			tm_pg = t;
+			if (ret < 0)break;
+		}
+		if ((t - tm)>RECV_TIMEOUT)break;
+		tm = t;
+
+		ret = smplws_select_ms(fd, SELECT__MULTI_MS);
+		if (ret <0)break;
+		if (ret>0){
+			ret = smplws_child_data(v, fd);
+			if (ret == -1)break;
+		}
+		ret = smplws_child_idle(v, fd);
+		if (ret == -1)break;
+	}
+	closesocket(fd);
+	smplws_child_fini(v);
+}
+
+void smplws_server_main_mt(){
+
+	int fd;
+	int s;
+	int ret;
+	s_server_stop = 0;
+
+	fd = smplws_server_create(PORT);
+	if (fd== -1)return;
+	printf("enter main loop\n");
+
+	while (1){
+		if (s_server_stop)break;
+		ret=smplws_select_ms(fd, SELECT__MULTI_MS);
+		if (ret < 0)break;
+		if (ret == 0)continue;
+		s = smplws_accept(fd);
+		ret=mytp_create(smplws_thread_func, (void*)s);
+		if (ret == -1){
+			closesocket(s);
+		}
+	}
+	closesocket(fd);
+	return;
+}
+
+#endif
+
 void smplws_server_main(){
 
 	int fd[MAX_FD];
@@ -591,7 +677,7 @@ void smplws_server_main(){
 
 	while (1){
 		if (s_server_stop)break;
-		smplws_select_multi(fd,MAX_FD,3);
+		smplws_select_multi_ms(fd,MAX_FD,SELECT__MULTI_MS);
 		t = smplws_gettime();
 	
 		for (i = 0; i < MAX_FD; i++){
@@ -610,7 +696,7 @@ void smplws_server_main(){
 				f_close = 1;
 				break;
 			}
-			ret = smplws_select(fd[i], 0);
+			ret = smplws_select_ms(fd[i], 0);
 			if (ret == 0)break;
 			if (i == 0){
 				int s;
@@ -673,15 +759,12 @@ void smplws_server_main(){
 
 int main()
 {
-#if defined(_WIN32) && !defined(__GNUC__)
-	//	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_WNDW);
-	//	_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_WNDW);
-	//	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_WNDW);
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#endif
-
 	smplws_init();
+#ifdef I_USE_THREAD
+	smplws_server_main_mt();
+#else
 	smplws_server_main();
+#endif
 	smplws_done();
 	return 0;
 }
